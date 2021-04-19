@@ -74,7 +74,7 @@ opposites = {'Situation'  : 'Mind',
             'Manipulation': 'Activity',
             'Mind'        : 'Situation'}
 
-with open('throughlines_master.txt') as f:
+with open('./data/throughlines_master.txt') as f:
     TL = f.read()
 root = Node('root')
 root.add_children([Node(line) for line in TL.splitlines() if line.strip()])
@@ -96,7 +96,7 @@ for ch in root.children:
 characters = []
 characters_bak = []
 
-with open('character_traits.txt') as f:
+with open('./data/character_traits.txt') as f:
         traits = f.read().splitlines()
 
 class CharWindow(QWidget):
@@ -105,7 +105,7 @@ class CharWindow(QWidget):
     
     def __init__(self):
         super().__init__()
-        loadUi("char_window.ui",self)
+        loadUi("./ui/char_window.ui",self)
         self.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, False)
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, False)
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, False)
@@ -326,7 +326,7 @@ class CharWindow(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        loadUi("main_window.ui",self)
+        loadUi("./ui/main_window.ui",self)
         
 
         self.emsg = QErrorMessage()
