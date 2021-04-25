@@ -6,12 +6,23 @@ import jsonpickle
 import pdf_report
 import os
 import copy
+import math
 from classes import *
 from PyQt5.uic import loadUi
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QDialog, QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QErrorMessage, QPushButton,QComboBox, QHBoxLayout,QVBoxLayout, QFileDialog, QButtonGroup, QRadioButton, QFrame
+from PyQt5.QtWidgets import QDialog, QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QErrorMessage, QPushButton, QToolButton, QComboBox, QHBoxLayout,QVBoxLayout, QFileDialog, QButtonGroup, QRadioButton, QFrame
+
+
+
+# Refactor the selector toggle and the button presses, different regions take different inputs so its fucked rn. 
+
+# Refactor the save, open, export to incorporate the buttons / nodes rather than box text. 
+
+# Illegal Lockout. 
+
+# Hover Hints
 
 # ========================== DEFINITIONS ============================
 FILE_PATH = ""
@@ -74,8 +85,21 @@ opposites = {'Situation'  : 'Mind',
             'Manipulation': 'Activity',
             'Mind'        : 'Situation'}
 
+STYLE_SITUATION = "background-color:rgb(56, 145, 166);color:white"
+STYLE_MIND = "background-color:rgb(81, 70, 99);color:white"
+STYLE_MANIPULATION = "background-color:rgb(214, 69, 80);color:white"
+STYLE_ACTIVITY = "background-color:rgb(82, 170, 94);color:white"
+
+STYLE = {'Situation'    : "background-color:rgb(56, 145, 166);  color:white",
+         'Mind'         : "background-color:rgb(81, 70, 99);    color:white",
+         'Manipulation' : "background-color:rgb(214, 69, 80);   color:white",
+         'Activity'     : "background-color:rgb(82, 170, 94);   color:white",
+         'Disabled'     : "background-color:rgb(100,100,100);   color:white"
+        }
+
 with open('./data/throughlines_master.txt') as f:
     TL = f.read()
+
 root = Node('root')
 root.add_children([Node(line) for line in TL.splitlines() if line.strip()])
 
@@ -93,16 +117,123 @@ for ch in root.children:
             for elem in var.children:
                 elements.append(elem)
 
+
+for branch in root.children:
+    style = STYLE[branch.text]
+    branch.style = style
+    for child in branch.children:
+        child.parent = branch
+        child.branch = branch
+        child.style = style
+        for g_child in child.children:
+            g_child.parent = child
+            g_child.branch = branch
+            g_child.style = style
+            for gg_child in g_child.children:
+                gg_child.parent = g_child
+                gg_child.branch = branch
+                gg_child.style = style
+
+
+node_levels = {0: classes,
+            1: types,
+            2: variants,
+            3: elements}
+
 characters = []
 characters_bak = []
+
+selector_button = None
+selector_node = None
 
 with open('./data/character_traits.txt') as f:
         traits = f.read().splitlines()
 
+class SelectorWindow(QDialog):
+    def __init__(self):
+        super().__init__()
+        loadUi("./ui/selector_window.ui",self)
+        self.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, False)
+        self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, False)
+        self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, False)
+
+    def keyPressEvent(self, event):
+        if event.key() == 16777216: #Escape key
+            self.hide()
+            mainwindow.setEnabled(True)
+            return
+        super().keyPressEvent(event)
+
+    def update_buttons(self, options, legal_options=None, bool_legal_only=False):
+        for i in reversed(range(self.grid_buttons.count())): 
+            self.grid_buttons.itemAt(i).widget().setParent(None)
+
+        grid_size = int(math.sqrt(len(options)))
+
+        if grid_size == 4: # this hard coded shit swaps the order of the list so its arranged in quadrants.
+            options[2], options[3], options[4], options[5] = options[4], options[5], options[2], options[3]
+            options[10], options[11], options[12], options[13] = options[12], options[13], options[10], options[11]
+
+        self.sent_options = []
+        self.sent_options.extend(options)
+
+        positions = [(x,y) for x in range(grid_size) for y in range(grid_size)]
+        for i, pos in enumerate(positions):
+            button = QPushButton(options[i].text, self)
+            button.setStyleSheet(options[i].style)
+            button.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
+                                                        QtWidgets.QSizePolicy.MinimumExpanding))
+
+            button.clicked.connect(self.button_clicked)
+
+            if legal_options and bool_legal_only == 2:
+                if options[i] not in legal_options:
+                    button.setEnabled(False)
+                    button.setStyleSheet(STYLE['Disabled'])
+
+            self.grid_buttons.addWidget(button, *pos)
+     
+
+
+    def button_clicked(self):
+        global selector_node
+        global selector_button
+        for i, b in enumerate(self.grid_buttons.parentWidget().findChildren(QPushButton)):
+            if b == self.sender():
+                selector_node = self.sent_options[i]
+                break
+
+        mainwindow.toggle_selector()
+
+        layout = selector_button.parent().layout()
+        
+
+        if layout == mainwindow.grid_throughlines:
+            idx = layout.indexOf(selector_button)
+            pos = layout.getItemPosition(idx)
+            if pos == (1,3,1,1): # MC Problem cell
+                mainwindow.copy_throughline_extras()
+
+            if mainwindow.chk_Seq_Thro.checkState() == 2:
+                if pos[1] < 3:
+                    next_button = layout.itemAtPosition(pos[0],pos[1]+1).widget()
+                    mainwindow.b_throughline_clicked(next_button)
+                else:
+                    return
+
+        if layout == mainwindow.grid_acts:
+            idx = layout.indexOf(selector_button)
+            pos = layout.getItemPosition(idx)
+            if mainwindow.chk_Seq_Acts.checkState() == 2:
+                if pos[1] < 3:
+                    next_button = layout.itemAtPosition(pos[0],pos[1]+1).widget()
+                    mainwindow.b_acts_clicked(next_button)
+                else:
+                    return
+
+        return
+
 class CharWindow(QWidget):
-    # global characters
-    # global old_characters
-    
     def __init__(self):
         super().__init__()
         loadUi("./ui/char_window.ui",self)
@@ -179,11 +310,57 @@ class CharWindow(QWidget):
             return
         else:
             # ADD LOGIC TO ACCOUNT FOR DIFFERENT GENERATION MODES (MAX/MIN/UNIQUE)
+            randomized_traits = copy.copy(traits)
+            random.shuffle(randomized_traits)
+
+            max_traits = len(traits)
+            min_traits = 0
+            bool_unique = False
+            bool_min = False
+            bool_min = False
+
             for c in characters:
                 c.traits = []
-            for trait in traits:
-                c = random.choice(characters)
-                c.add_trait(trait)
+
+            if self.chk_Max.checkState() == 2: max_traits = self.sb_Max.value()
+            if self.chk_Min.checkState() == 2: min_traits = self.sb_Min.value()
+            if self.chk_Unique.checkState() == 2: bool_unique = True
+
+            if bool_unique:
+                for trait in randomized_traits:
+                    
+                    c_least_traits = len(randomized_traits)
+
+                    for c in characters: # Find least number of traits
+                        if len(c.traits) < c_least_traits: 
+                            c_least_traits = len(c.traits)
+
+                    c_valid = [] # Reset list of valid characters
+                    for c in characters:
+                        no_traits = len(c.traits)
+                        if c_least_traits < min_traits: # There are characters that don't meet the requirement. 
+                            if no_traits == c_least_traits: # If a character has the least number of traits
+                                c_valid.append(c)
+
+                        else: # If all characters at least have the minimum
+                            if no_traits < max_traits:
+                                c_valid.append(c)
+
+                    if c_valid: # if there are valid characters left
+                        c = random.choice(c_valid)
+                        c.add_trait(trait)
+
+                    else:
+                        break
+
+            else: # Selection with duplicates
+                for c in characters:
+                    num_traits = random.randint(min_traits, max_traits)
+                    sample = random.sample(randomized_traits,num_traits)
+
+                    for t in sample:
+                        c.add_trait(t)          
+            
             self.update_char_list()
     
     def name_check(self):
@@ -282,7 +459,6 @@ class CharWindow(QWidget):
         self.b_Delete.setEnabled(not state)
         self.listWidget_Chars.setEnabled(not state)
         self.b_Done.setEnabled(not state)
-        self.b_Cancel.setEnabled(not state)
 
     def Delete(self):
         sel = self.listWidget_Chars.selectedItems()
@@ -327,7 +503,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         loadUi("./ui/main_window.ui",self)
-        
 
         self.emsg = QErrorMessage()
         self.emsg.setWindowModality(QtCore.Qt.WindowModal)
@@ -335,6 +510,8 @@ class MainWindow(QMainWindow):
 
         self.initUI()
         self.char_window = CharWindow()
+        self.selector_window = SelectorWindow()
+
         self.b_Edit_Characters.clicked.connect(self.edit_chars)
         self.b_clear_dyn.clicked.connect(self.clear_dynamics)
         self.b_rand_dyn_miss.clicked.connect(self.rand_dynamics_missing)
@@ -345,6 +522,11 @@ class MainWindow(QMainWindow):
         self.b_rand_acts_all.clicked.connect(self.rand_acts_all)
 
         self.b_rand_EVERYTHING.clicked.connect(self.rand_EVERYTHING)
+
+        self.b_Crucial_Element.clicked.connect(self.b_crucial_clicked)
+        self.b_clear_thro.clicked.connect(self.b_clear_throughlines)
+        self.b_clear_abstracts.clicked.connect(lambda: self.reset_button_layout(self.grid_abstracts))
+        self.b_clear_acts.clicked.connect(lambda: self.reset_button_layout(self.grid_acts))
 
     def initUI(self):
 
@@ -365,6 +547,23 @@ class MainWindow(QMainWindow):
         self.actionExport_pdf.triggered.connect(self.exportCall)
 
         self.update_char_layout()
+
+        # Fill Throughline and Acts grids with buttons
+        positions = [(i, j) for i in range(4) for j in range(4)]
+        for i, pos in enumerate(positions):
+            widget = QPushButton('th_'+str(i),self)
+            widget.clicked.connect(self.b_throughline_clicked)
+            widget.setText(BLANK_TEXT)
+            self.grid_throughlines.addWidget(widget, *pos)
+
+            widget = QPushButton('ac_'+str(i),self)
+            widget.clicked.connect(self.b_acts_clicked)
+            widget.setText(BLANK_TEXT)
+            self.grid_acts.addWidget(widget,*pos)
+
+        for i, button in enumerate(self.grid_abstracts.parentWidget().findChildren(QPushButton)):
+            button.setText(BLANK_TEXT)
+            button.clicked.connect(self.b_abstract_clicked)
 
         # GENERATE THE DYNAMICS TABLES WITH BUTTONS N SHIT
         positions = [(i, j) for i in range(8) for j in range(3)]
@@ -443,19 +642,197 @@ class MainWindow(QMainWindow):
                     if combo.findText(elem) == -1:
                         combo.addItem(elem)
                     self.cb_Crucial_Element.addItem(elem)
-
       
         for combo in self.layout_abstracts.parentWidget().findChildren(QComboBox):
             combo.addItem(BLANK_TEXT)
             for ty in types:
                 combo.addItem(ty.text)
 
-
         for combo in self.layout_acts.parentWidget().findChildren(QComboBox):
             combo.addItem(BLANK_TEXT)
             for ty in types:
                 combo.addItem(ty.text)
 
+    def set_node_button(self, button, text, style):
+        button.setText(text)
+        button.setStyleSheet(style)
+
+    def b_clear_throughlines(self):
+        self.reset_button_layout(self.grid_throughlines)
+        self.set_node_button(self.b_Crucial_Element,BLANK_TEXT, "")
+
+    def copy_throughline_extras(self):
+        crucial_text = self.grid_throughlines.itemAtPosition(1,3).widget().text()
+
+        if crucial_text != BLANK_TEXT:
+            crucial_node = self.find_node(crucial_text, self.grid_throughlines.itemAtPosition(1,0).widget().text())
+
+            self.set_node_button(self.b_Crucial_Element,crucial_node.text, crucial_node.style)
+            self.set_node_button(self.grid_throughlines.itemAtPosition(0,3).widget(),crucial_node.text, crucial_node.style)
+
+
+    def b_throughline_clicked(self, button=None):
+        if not button:
+            button = self.sender()
+        else:
+            print('prog exec')
+
+        layout = button.parent().layout()
+        idx = layout.indexOf(button)
+        pos = layout.getItemPosition(idx)
+
+        siblings = []
+        cousins = []
+
+        if pos[1] == 0: # if its a root branch
+            cousins = root.children
+            selected = []
+
+            for y in range(4):
+                text = layout.itemAtPosition(y,0).widget().text()
+                if self.find_node(text): selected.append(self.find_node(text))
+
+            for branch in cousins:
+                if branch not in selected:
+                    siblings.append(branch)
+
+        else:
+            branch_text = layout.itemAtPosition(pos[0],0).widget().text()
+            parent_text = layout.itemAtPosition(pos[0],pos[1]-1).widget().text()
+
+            try:
+                parent_node = self.find_node(parent_text, branch_text, pos[1]-1)
+                siblings.extend(parent_node.children)
+                cousins = self.find_cousins(parent_node)
+            except:
+                print('exception')
+                return
+        try:
+            self.toggle_selector(button, layout, idx, pos, cousins, siblings, self.chk_Legal_Only_Thro.checkState())
+        except:
+            return
+
+    def b_crucial_clicked(self):
+        layout = self.grid_throughlines
+
+        branch_node_text = layout.itemAtPosition(1,0).widget().text()
+        branch_node = self.find_node(branch_node_text)
+
+        mc_problem_text = layout.itemAtPosition(1,3).widget().text()
+        mc_problem_node = self.find_node(mc_problem_text, branch_node_text, 3)
+
+        parent_node_text = layout.itemAtPosition(1,2).widget().text()
+        if parent_node_text != BLANK_TEXT:
+            try:
+                siblings = []
+                cousins = []
+                parent_node = self.find_node(parent_node_text, branch_node_text, 2)
+
+                siblings.append(mc_problem_node)
+
+                cousins = self.find_cousins(parent_node)
+                self.toggle_selector(self.sender(), layout, None, None, cousins, siblings, self.chk_Legal_Only_Thro.checkState())
+            except:
+                print('exception')
+                return
+
+    def b_abstract_clicked(self):
+        button = self.sender()
+        options_all = copy.copy(types)
+        selected = []
+
+        for b in self.grid_abstracts.parentWidget().findChildren(QPushButton):
+            if b.text() != BLANK_TEXT:
+                selected.append(self.find_node(b.text()))
+
+        legal_options = []
+
+        for o in options_all:
+            if o in selected:
+                continue
+            legal_options.append(o)
+
+        self.toggle_selector(button, self.grid_abstracts, None, None, options_all, legal_options, self.chk_Legal_Only_Abstracts.checkState())
+
+    def b_acts_clicked(self, button=None):
+        if not button:
+            button = self.sender()
+        else:
+            print('prog exec')
+
+        layout = button.parent().layout()
+        idx = layout.indexOf(button)
+        pos = layout.getItemPosition(idx)
+
+        branch_text = self.grid_throughlines.itemAtPosition(pos[0],0).widget().text()
+        branch = self.find_node(branch_text)
+
+        if not branch:
+            return
+
+        acts_all = []
+        acts_all.extend(branch.children)
+
+        acts_picked = []
+        for x in range(4):
+            if x == pos[1]:
+                continue
+            picked_text = layout.itemAtPosition(pos[0],x).widget().text()
+            if picked_text != BLANK_TEXT:
+                acts_picked.append(self.find_node(picked_text))
+
+        acts_legal = []
+        for act in acts_all:
+            if act not in acts_picked: 
+                acts_legal.append(act)
+
+        try:
+            self.toggle_selector(button, layout, idx, pos, acts_all, acts_legal, self.chk_Legal_Only_Acts.checkState())
+        except:
+            return
+
+    def toggle_selector(self, button=None, layout=None, idx=None, pos=None, cousins=None, siblings=None, bool_legal_only=False):
+        global selector_node
+        global selector_button
+
+        if self.selector_window.isVisible():
+
+            self.set_node_button(selector_button, selector_node.text, selector_node.style)
+            self.selector_window.hide()
+            self.setEnabled(True)
+                 
+            selector_button_layout = selector_button.parent().layout()
+            
+            if selector_button_layout == self.grid_throughlines:
+                idx = selector_button_layout.indexOf(selector_button)
+                pos = selector_button_layout.getItemPosition(idx)
+                for x in range(pos[1]+1,4):
+                    b = selector_button_layout.itemAtPosition(pos[0],x).widget()
+                    self.set_node_button(b, BLANK_TEXT, "")
+
+        else:
+            selector_button = button
+            self.selector_window.show() 
+            self.selector_window.update_buttons(cousins, siblings, bool_legal_only)
+            self.setEnabled(False)
+
+    def find_cousins(self, parent_node):
+        cousins = []
+
+        if parent_node.level == 0:
+            cousins.extend(parent_node.children)
+
+        else:
+            for gp_node in node_levels[parent_node.level-1]:
+                for p_node in gp_node.children:
+                    if p_node == parent_node:
+                        grandparent = gp_node
+                        break
+
+            for au in grandparent.children:
+                for c in au.children:
+                    cousins.append(c)
+        return cousins
 
     def find_chars(self, trait):
         data = []
@@ -655,30 +1032,51 @@ class MainWindow(QMainWindow):
             cb_throughlines.extend(self.gen_throughline(roots[x]))
 
         # Overall Story problem is supposed to match the Main Character Problem
-        cb_throughlines[3] = cb_throughlines[7] 
+        try:
+            cb_throughlines[3] = self.find_node(cb_throughlines[7].text, cb_throughlines[0].text)
+        except:
+            cb_throughlines[3] = cb_throughlines[7]
 
-        for i, combo in enumerate(self.layout_throughlines.parentWidget()
-                .findChildren(QComboBox)):
-            combo.setCurrentIndex(combo.findText(cb_throughlines[i].text))
 
-        self.cb_Crucial_Element.setCurrentIndex(combo.findText(cb_throughlines[7].text))
+        for i, button in enumerate(self.grid_throughlines.parentWidget()
+                                    .findChildren(QPushButton)):
+            self.set_node_button(button, cb_throughlines[i].text, cb_throughlines[i].style)
+        self.set_node_button(self.b_Crucial_Element,cb_throughlines[7].text, cb_throughlines[7].style)
         
-    def find_node(self, string):
+    def find_node(self, string, branch=None, level=None):
+        found = []
+        if string == BLANK_TEXT: return
+
         for cl in root.children:
-            if cl.text == string: return cl
+            if branch:
+                if cl.text != branch:
+                    continue
+            if cl.text == string: 
+                found.append(cl)
             for ty in cl.children:
-                if ty.text == string: return ty
+                if ty.text == string: 
+                    found.append(ty)
                 for var in ty.children:
-                    if var.text == string: return var
+                    if var.text == string: 
+                        found.append(var)
                     for elem in var.children:
-                        if elem.text == string: return elem
-        return   
+                        if elem.text == string: 
+                            found.append(elem)
+
+        # error checking for multiple results. 
+        if level and found:
+            for node in found:
+                if node.level == level:
+                    found = [node]
+
+        return found[0]
 
     def read_throughlines_state(self):
         content = []
-        for i, combo in enumerate(self.layout_throughlines.parentWidget()
-                .findChildren(QComboBox)):
-            content.append(combo.currentText())
+
+        for i, button in enumerate(self.grid_throughlines.parentWidget()
+                                    .findChildren(QPushButton)):
+            content.append(button.text())
 
         return content
 
@@ -686,13 +1084,16 @@ class MainWindow(QMainWindow):
     def rand_abstracts_all(self):
         choices = list(types)
         random.shuffle(choices)
-        for i, combo in enumerate(self.layout_abstracts.parentWidget().findChildren(QComboBox)):
-            combo.setCurrentIndex(combo.findText(choices[i].text))
+        for i, button in enumerate(self.grid_abstracts.parentWidget()
+                                    .findChildren(QPushButton)):
+            self.set_node_button(button, choices[i].text, choices[i].style)
 
     def read_abstracts_state(self):
         content = []
-        for i, combo in enumerate(self.layout_abstracts.parentWidget().findChildren(QComboBox)):
-            content.append(combo.currentText())
+
+        for i, button in enumerate(self.grid_abstracts.parentWidget()
+                                    .findChildren(QPushButton)):
+            content.append(button.text())
 
         return content
 
@@ -714,21 +1115,26 @@ class MainWindow(QMainWindow):
             for b in branch_nodes:
                 choices = []
                 for child in b.children:
-                    choices.append(child.text)
+                    choices.append(child)
                 random.shuffle(choices)
                 acts.extend(choices)
 
-            for i, combo in enumerate(self.layout_acts.parentWidget()
-                    .findChildren(QComboBox)):
-                combo.setCurrentIndex(combo.findText(acts[i]))
+            for i, button in enumerate(self.grid_acts.parentWidget()
+                                    .findChildren(QPushButton)):
+                self.set_node_button(button, acts[i].text, acts[i].style)
+
         except:
             return
 
     def read_acts_state(self):
         content = []
-        for i, combo in enumerate(self.layout_acts.parentWidget()
-                .findChildren(QComboBox)):
-            content.append(combo.currentText())
+        # for i, combo in enumerate(self.layout_acts.parentWidget()
+        #         .findChildren(QComboBox)):
+        #     content.append(combo.currentText())
+
+        for i, button in enumerate(self.grid_acts.parentWidget()
+                                    .findChildren(QPushButton)):
+            content.append(button.text())
 
         return content
 # =========================== SAVE ===============================
@@ -756,13 +1162,11 @@ class MainWindow(QMainWindow):
             _data['abstracts'] = self.read_abstracts_state()
 
             _data['acts'] = self.read_acts_state()
-            # for thro in self.read_throughlines_state():
-            #     _data['throughlines'].append(thro)
+
             return _data
 
         except:
             pass
-
 
     def saveCall(self):
         global FILE_PATH
@@ -782,6 +1186,14 @@ class MainWindow(QMainWindow):
         else:
             return
 
+    def reset_button_layout(self,layout):
+        try:
+            for i, button in enumerate(layout.parentWidget()
+                                        .findChildren(QPushButton)):
+                    self.set_node_button(button,BLANK_TEXT, "")   
+        except:
+            return
+
 
     def newCall(self):
         global characters
@@ -792,17 +1204,12 @@ class MainWindow(QMainWindow):
         for button in self.layout_dynamics.parentWidget().findChildren(QPushButton):
             button.setChecked(False)
 
-        for i, combo in enumerate(self.layout_throughlines.parentWidget()
-                                                .findChildren(QComboBox)):
-            combo.setCurrentIndex(combo.findText(BLANK_TEXT))
+        layouts = [self.grid_throughlines, self.grid_abstracts, self.grid_acts]
 
-        for i, combo in enumerate(self.layout_abstracts.parentWidget()
-                                                .findChildren(QComboBox)):
-            combo.setCurrentIndex(combo.findText(BLANK_TEXT))
-
-        for i, combo in enumerate(self.layout_acts.parentWidget()
-                                                .findChildren(QComboBox)):
-            combo.setCurrentIndex(combo.findText(BLANK_TEXT))
+        for layout in layouts:
+            self.reset_button_layout(layout)
+            
+        self.set_node_button(self.b_Crucial_Element, BLANK_TEXT, "")
 
     def openCall(self):
         global characters
@@ -828,26 +1235,31 @@ class MainWindow(QMainWindow):
             button.setChecked(False)
             if button.text() in in_data['dynamics']: button.setChecked(True)
 
-        for i, combo in enumerate(self.layout_throughlines.parentWidget()
-                                                .findChildren(QComboBox)):
+        for i, button in enumerate(self.grid_throughlines.parentWidget()
+                                    .findChildren(QPushButton)):
             try:
-                combo.setCurrentIndex(combo.findText(in_data['throughlines'][i]))
-                if combo.objectName() == 'cb_Problem_1':
-                    self.cb_Crucial_Element.setCurrentIndex(combo.findText(in_data['throughlines'][i]))
+                if i % 4 == 0:
+                    branch = self.find_node(in_data['throughlines'][i])
+                node = self.find_node(in_data['throughlines'][i],branch.text)
+                self.set_node_button(button, node.text, node.style)
+                if i == 7:
+                    self.set_node_button(self.b_Crucial_Element, node.text, node.style)
             except:
-                print("Error loading throuhglines, save may be corrupted")
+                print("Error loading throughlines, save may be corrupted")
 
-        for i, combo in enumerate(self.layout_abstracts.parentWidget()
-                                            .findChildren(QComboBox)):
+        for i, button in enumerate(self.grid_abstracts.parentWidget()
+                                    .findChildren(QPushButton)):
             try:
-                combo.setCurrentIndex(combo.findText(in_data['abstracts'][i]))
+                node = self.find_node(in_data['abstracts'][i])
+                self.set_node_button(button, node.text, node.style)
             except:
                 print("Error loading abstracts, save may be corrupted")
 
-        for i, combo in enumerate(self.layout_acts.parentWidget()
-                                                .findChildren(QComboBox)):
+        for i, button in enumerate(self.grid_acts.parentWidget()
+                                    .findChildren(QPushButton)):
             try:
-                combo.setCurrentIndex(combo.findText(in_data['acts'][i]))
+                node = self.find_node(in_data['acts'][i])
+                self.set_node_button(button, node.text, node.style)
             except:
                 print("Error loading acts, save may be corrupted")
 
