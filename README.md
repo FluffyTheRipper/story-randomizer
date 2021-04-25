@@ -4,8 +4,8 @@ Tool for generating random story structures based on Dramatica Table of Story El
 Based on a theory and materials developed by Melanie Anne Phillips & Chris Huntley
 
 Todo:
-  Implement tooltips (based on text file).
+   - Implement tooltips (based on text file).
   
-  Remove hard references to avoid mismatch errors.
+   - Remove hard references to avoid mismatch errors.
   
-  Package it properly with PyInstaller. 
+   - Package it properly with PyInstaller. 
