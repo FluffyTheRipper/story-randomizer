@@ -6,10 +6,13 @@ import jsonpickle
 
 class Node():
     def __init__(self, indented_line):
-        self.children = []
         self.parent = None
+        self.children = []
         self.level = len(indented_line) - len(indented_line.lstrip())
         self.text = indented_line.strip()
+        self.color = None
+        self.style = None
+        self.branch = None
 
 
     def add_children(self, nodes):

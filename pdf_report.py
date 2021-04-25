@@ -298,7 +298,7 @@ def save(path, save_path):
 	if check_newpage((curr_height - h),canvas):
 		curr_height = PDF_HEIGHT-margin
 
-	canvas.drawString(margin,curr_height+2, "Table 5 - Flavour")
+	canvas.drawString(margin,curr_height+2, "Table 5 - Abstracts")
 
 	curr_height -= h
 	table6.wrapOn(canvas, margin,curr_height)

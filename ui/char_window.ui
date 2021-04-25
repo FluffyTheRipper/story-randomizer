@@ -84,19 +84,6 @@
     <string>Add</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="b_Sort">
-   <property name="geometry">
-    <rect>
-     <x>320</x>
-     <y>240</y>
-     <width>101</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Sort List</string>
-   </property>
-  </widget>
   <widget class="QPushButton" name="b_Delete">
    <property name="geometry">
     <rect>
@@ -133,7 +120,7 @@
     </rect>
    </property>
    <property name="toolTip">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Each trait is only be assigned once. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Trait assignments unique, or allow duplicates&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="text">
     <string>Unique</string>
@@ -383,7 +370,7 @@
     </rect>
    </property>
    <property name="text">
-    <string> </string>
+    <string/>
    </property>
   </widget>
   <widget class="QPushButton" name="b_Edit_Save">
