@@ -19,22 +19,11 @@ HEADER_TEXT_COLOR = whitesmoke
 BODY_COLOR = white
 BODY_TEXT_COLOR = black
 
-CHARACTER_TRAITS = ['Conscience',
-                    'Consider',
-                    'Controlled',
-                    'Disbelief',
-                    'Faith',
-                    'Feeling',
-                    'Help',
-                    'Hinder',
-                    'Logic',
-                    'Oppose',
-                    'Persue',
-                    'Prevent',
-                    'Reconsider',
-                    'Support',
-                    'Temptation',
-                    'Uncontrolled']
+
+with open("./data/character_traits.txt") as f:
+	traits = f.read().splitlines()
+
+CHARACTER_TRAITS = traits
 
 dynamic_headings = ["Resolve",
                     "Growth",

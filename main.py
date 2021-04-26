@@ -7,22 +7,27 @@ import pdf_report
 import os
 import copy
 import math
+from configparser import ConfigParser
 from classes import *
 from PyQt5.uic import loadUi
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QDialog, QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QErrorMessage, QPushButton, QToolButton, QComboBox, QHBoxLayout,QVBoxLayout, QFileDialog, QButtonGroup, QRadioButton, QFrame
+from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtWidgets import QDialog, QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QErrorMessage, QPushButton, QToolButton, QComboBox, QHBoxLayout,QVBoxLayout, QFileDialog, QButtonGroup, QRadioButton, QFrame, QToolTip
 
 
 
 # Refactor the selector toggle and the button presses, different regions take different inputs so its fucked rn. 
 
-# Refactor the save, open, export to incorporate the buttons / nodes rather than box text. 
-
-# Illegal Lockout. 
-
 # Hover Hints
+
+
+config_object = ConfigParser()
+config_object.read('config.ini')
+
+BG_COLOURS = config_object['BG_COLOURS']
+TEXT_COLOURS = config_object['TEXT_COLOURS']
+
 
 # ========================== DEFINITIONS ============================
 FILE_PATH = ""
@@ -34,23 +39,6 @@ HEADING_FONT.setBold(True)
 COLOR_HEADING_BACKGROUND = "background-color: grey"
 
 def_char_names = ["Eins","Zwei","Drei","Vier","Funf","Sechs","Sieben","Acht","Neun","Zehn"]
-
-CHARACTER_TRAITS = ['Conscience',
-                    'Consider',
-                    'Controlled',
-                    'Disbelief',
-                    'Faith',
-                    'Feeling',
-                    'Help',
-                    'Hinder',
-                    'Logic',
-                    'Oppose',
-                    'Persue',
-                    'Prevent',
-                    'Reconsider',
-                    'Support',
-                    'Temptation',
-                    'Uncontrolled']
 
 dynamics = {"Resolve":["Change", "Steadfast"],
             "Growth":["Start", "Stop"],
@@ -85,11 +73,6 @@ opposites = {'Situation'  : 'Mind',
             'Manipulation': 'Activity',
             'Mind'        : 'Situation'}
 
-STYLE_SITUATION = "background-color:rgb(56, 145, 166);color:white"
-STYLE_MIND = "background-color:rgb(81, 70, 99);color:white"
-STYLE_MANIPULATION = "background-color:rgb(214, 69, 80);color:white"
-STYLE_ACTIVITY = "background-color:rgb(82, 170, 94);color:white"
-
 STYLE = {'Situation'    : "background-color:rgb(56, 145, 166);  color:white",
          'Mind'         : "background-color:rgb(81, 70, 99);    color:white",
          'Manipulation' : "background-color:rgb(214, 69, 80);   color:white",
@@ -117,24 +100,6 @@ for ch in root.children:
             for elem in var.children:
                 elements.append(elem)
 
-
-for branch in root.children:
-    style = STYLE[branch.text]
-    branch.style = style
-    for child in branch.children:
-        child.parent = branch
-        child.branch = branch
-        child.style = style
-        for g_child in child.children:
-            g_child.parent = child
-            g_child.branch = branch
-            g_child.style = style
-            for gg_child in g_child.children:
-                gg_child.parent = g_child
-                gg_child.branch = branch
-                gg_child.style = style
-
-
 node_levels = {0: classes,
             1: types,
             2: variants,
@@ -147,12 +112,61 @@ selector_button = None
 selector_node = None
 
 with open('./data/character_traits.txt') as f:
-        traits = f.read().splitlines()
+    traits = f.read().splitlines()
+
+with open('./data/tooltips.txt') as f:
+    tooltips = f.read().splitlines()
+
+tooltip_delimeter = tooltips[0].split('"')[1]
+
+def get_tooltip(text=None):
+    for tt in tooltips:
+        name = tt.split(tooltip_delimeter)
+        if text == name[0]: 
+            return name[1]
+    return "Tooltip missing, add definition to tooltips.txt. Verify delimeter is correct"
+
+def change_style_color(style, bg_color, text_color):
+    style_string = f"""QPushButton {{
+                            background-color: rgb{bg_color}; 
+                            color: rgb{text_color};
+                            }}
+                        QToolTip {{
+                            color: black; 
+                            background-color: rgb(240,240,240); 
+                            border: 1px solid black; 
+                            }}
+                        """
+    try:
+        STYLE[style] = (style_string)
+    except:
+        print('Style change error')
+        return
+
+def refresh_styles():
+    for branch in root.children:
+        style = STYLE[branch.text]
+        branch.style = style
+        for child in branch.children:
+            child.parent = branch
+            child.branch = branch
+            child.style = style
+            for g_child in child.children:
+                g_child.parent = child
+                g_child.branch = branch
+                g_child.style = style
+                for gg_child in g_child.children:
+                    gg_child.parent = g_child
+                    gg_child.branch = branch
+                    gg_child.style = style
 
 class SelectorWindow(QDialog):
     def __init__(self):
         super().__init__()
         loadUi("./ui/selector_window.ui",self)
+
+        self.setWindowIcon(QIcon('./ui/icon.png'))
+
         self.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, False)
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, False)
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, False)
@@ -181,6 +195,7 @@ class SelectorWindow(QDialog):
         for i, pos in enumerate(positions):
             button = QPushButton(options[i].text, self)
             button.setStyleSheet(options[i].style)
+            button.setToolTip(get_tooltip(options[i].text))
             button.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
                                                         QtWidgets.QSizePolicy.MinimumExpanding))
 
@@ -237,6 +252,8 @@ class CharWindow(QWidget):
     def __init__(self):
         super().__init__()
         loadUi("./ui/char_window.ui",self)
+
+        self.setWindowIcon(QIcon('./ui/icon.png'))
         self.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, False)
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, False)
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, False)
@@ -272,6 +289,7 @@ class CharWindow(QWidget):
         for i, t in enumerate(trait_boxes):
             t.setText(traits[i])
             t.setEnabled(False)
+            t.setToolTip(get_tooltip(traits[i]))
 
         self.editing_char = None
 
@@ -497,12 +515,14 @@ class CharWindow(QWidget):
             if v > 1:
                 for i, c in enumerate(characters):
                     if k in c.traits:
-                        self.listWidget_Chars.item(i).setForeground(Qt.cyan)
+                        self.listWidget_Chars.item(i).setBackground(Qt.lightGray)
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         loadUi("./ui/main_window.ui",self)
+
+        self.setWindowIcon(QIcon('./ui/icon.png'))
 
         self.emsg = QErrorMessage()
         self.emsg.setWindowModality(QtCore.Qt.WindowModal)
@@ -529,6 +549,11 @@ class MainWindow(QMainWindow):
         self.b_clear_acts.clicked.connect(lambda: self.reset_button_layout(self.grid_acts))
 
     def initUI(self):
+
+        # Load colors from config file
+        for branch in root.children:
+            change_style_color(branch.text, BG_COLOURS[branch.text], TEXT_COLOURS[branch.text])
+        refresh_styles()
 
         self.actionNew.setShortcut('Ctrl+N')
         self.actionNew.setStatusTip('New document')
@@ -587,6 +612,7 @@ class MainWindow(QMainWindow):
             if name in dynamic_headings:
                 widget = QLabel(name,self)
                 widget.setFont(HEADING_FONT)
+
                 widget.setAlignment(Qt.AlignCenter)
             else:
                 widget = QPushButton(name,self)
@@ -599,63 +625,10 @@ class MainWindow(QMainWindow):
 
             self.grid_p_dynamics.addWidget(widget, *position)
 
-        # Initialize the Dropdowns to default values
-        ordered_classes = []
-        for cl in classes: ordered_classes.append(cl.text)
-        ordered_classes = list(set(ordered_classes))
-        ordered_classes.sort()
-
-        ordered_types = []
-        for cl in types: ordered_types.append(cl.text)
-        ordered_types = list(set(ordered_types))
-        ordered_types.sort()
-
-        ordered_variants = []
-        for cl in variants: ordered_variants.append(cl.text)
-        ordered_variants = list(set(ordered_variants))
-        ordered_variants.sort()
-
-        ordered_elements = []
-        for cl in elements: ordered_elements.append(cl.text)
-        ordered_elements = list(set(ordered_elements))
-        ordered_elements.sort()
-
-        self.cb_Crucial_Element.addItem(BLANK_TEXT)
-
-        for combo in self.layout_throughlines.parentWidget().findChildren(QComboBox):
-            combo.addItem(BLANK_TEXT)
-
-            if "Class" in combo.objectName():
-                for cl in ordered_classes: 
-                    if combo.findText(cl) == -1:
-                        combo.addItem(cl)
-            if "Concern" in combo.objectName():
-                for ty in ordered_types: 
-                    if combo.findText(ty) == -1:
-                        combo.addItem(ty)
-            if "Issue" in combo.objectName():
-                for var in ordered_variants: 
-                    if combo.findText(var) == -1:
-                        combo.addItem(var)
-            if "Problem" in combo.objectName():
-                for elem in ordered_elements: 
-                    if combo.findText(elem) == -1:
-                        combo.addItem(elem)
-                    self.cb_Crucial_Element.addItem(elem)
-      
-        for combo in self.layout_abstracts.parentWidget().findChildren(QComboBox):
-            combo.addItem(BLANK_TEXT)
-            for ty in types:
-                combo.addItem(ty.text)
-
-        for combo in self.layout_acts.parentWidget().findChildren(QComboBox):
-            combo.addItem(BLANK_TEXT)
-            for ty in types:
-                combo.addItem(ty.text)
-
     def set_node_button(self, button, text, style):
         button.setText(text)
         button.setStyleSheet(style)
+        button.setToolTip(get_tooltip(text))
 
     def b_clear_throughlines(self):
         self.reset_button_layout(self.grid_throughlines)
@@ -666,10 +639,9 @@ class MainWindow(QMainWindow):
 
         if crucial_text != BLANK_TEXT:
             crucial_node = self.find_node(crucial_text, self.grid_throughlines.itemAtPosition(1,0).widget().text())
-
+            
             self.set_node_button(self.b_Crucial_Element,crucial_node.text, crucial_node.style)
             self.set_node_button(self.grid_throughlines.itemAtPosition(0,3).widget(),crucial_node.text, crucial_node.style)
-
 
     def b_throughline_clicked(self, button=None):
         if not button:
@@ -883,6 +855,7 @@ class MainWindow(QMainWindow):
             c_widget.setFrameShadow(QFrame.Plain)
             c_widget.setStyleSheet(COLOR_HEADING_BACKGROUND)
             
+            
             t_widget = QLabel(c_traits[i],self)
             t_widget.setAlignment(Qt.AlignCenter)
             t_widget.setText(c_traits[i])
@@ -904,7 +877,7 @@ class MainWindow(QMainWindow):
         cur_col = 0
         cur_row = 0
 
-        for trait in CHARACTER_TRAITS:
+        for trait in traits:
             t_widget = QLabel(trait,self)
             t_widget.setFont(HEADING_FONT)
             t_widget.setAlignment(Qt.AlignCenter)
@@ -913,6 +886,7 @@ class MainWindow(QMainWindow):
             t_widget.setFrameShape(QFrame.Box)
             t_widget.setFrameShadow(QFrame.Plain)
             t_widget.setStyleSheet(COLOR_HEADING_BACKGROUND)
+            t_widget.setToolTip(get_tooltip(trait))
 
             chars_w_trait = []
             for c in characters:
@@ -1128,9 +1102,6 @@ class MainWindow(QMainWindow):
 
     def read_acts_state(self):
         content = []
-        # for i, combo in enumerate(self.layout_acts.parentWidget()
-        #         .findChildren(QComboBox)):
-        #     content.append(combo.currentText())
 
         for i, button in enumerate(self.grid_acts.parentWidget()
                                     .findChildren(QPushButton)):
@@ -1285,6 +1256,7 @@ class MainWindow(QMainWindow):
 
 # Startup
 app = QApplication(sys.argv)
+app.setWindowIcon(QIcon('./ui/icon.png'))
 # app.setStyleSheet(qdarkstyle.load_stylesheet())
 mainwindow = MainWindow()
 mainwindow.show()

@@ -13,6 +13,7 @@ class Node():
         self.color = None
         self.style = None
         self.branch = None
+        self.tooltip = None
 
 
     def add_children(self, nodes):

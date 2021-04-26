@@ -1,0 +1,24 @@
+delimeter= ": "
+# Insert definitons with the format [Entry][delimeter][Definition], keep the definition on a single line.
+# Lookup is case-sensitive so if your definitions aren't showing up in the program its likely missing, problem with the delimeter, or spelling. 
+[NODES]
+Situation: Test_tip - situation
+Mind: Test_tip - Mind
+
+[TRAITS]
+Conscience: TEST
+Consider: 
+Controlled: 
+Disbelief: 
+Faith: 
+Feeling: 
+Help: 
+Hinder: 
+Logic: 
+Oppose: 
+Persue: 
+Prevent: 
+Reconsider: 
+Support: 
+Temptation: 
+Uncontrolled: 
